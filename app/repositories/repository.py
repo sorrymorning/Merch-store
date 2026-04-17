@@ -14,31 +14,32 @@ class UserRepository:
 
     async def get_by_id(self, user_id: int):
         return await self.db.get(Users, user_id)
+    
+    async def get_by_username(self, username: str):
+        result = await self.db.execute(
+            select(Users).where(Users.username == username)
+        )
+        return result.scalar_one_or_none()
 
     async def update(self, user: Users):
         self.db.add(user)
 
 
-    
+
+
+
 
 class PurchRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def buy_item(self, name: str, user_id: int):
-        item_id = await self.db.scalar(
-            select(Merch.id).where(Merch.name == name)
+    async def get_merch_by_name(self, name: str):
+        return await self.db.scalar(
+            select(Merch).where(Merch.name == name)
         )
-        if not item_id:
-            raise ValueError(f"Товар с именем {name} не найден")
-        
-        
-        purch = Purchases(user_id=user_id, merch_id=item_id) 
-        self.db.add(purch)
-        await self.db.flush()
-        await self.db.commit()
-        
-        return purch
+    async def create_purchase(self, user_id: int, merch_id: int):
+        purchase = Purchases(user_id=user_id, merch_id=merch_id)
+        self.db.add(purchase)
     
 
 class TransactionRepository:
