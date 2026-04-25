@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.repository import UserRepository
-from app.repositories.repository import PurchRepository
+from app.repositories.repository import InventoryRepository
 from app.repositories.repository import TransactionRepository
 from services_errors import (UserNotFoundError, 
                              NotEnoughCoinsError, 
@@ -16,10 +16,14 @@ class UserService:
     def __init__(self, db:AsyncSession):
         self.db = db
         self.user_repo = UserRepository(db)
+        self.transaction_repo = TransactionRepository(db)
+        self.inventory_repo = InventoryRepository(db)
 
     async def get_user(self, user_id:int):
-        return await self.user_repo.get_by_id(user_id)
-    
+        user = await self.user_repo.get_by_id(user_id)
+        inventory = await self.inventory_repo.get_inventory(user_id)
+        transaction = ...
+
 
 class TransactionService:
     def __init__(self, db:AsyncSession):
@@ -54,23 +58,34 @@ class TransactionService:
 
         await self.db.commit()
 
-
-class PurchaseService:
-    def __init__(self, db:AsyncSession):
+# Исправить инвентарь!!!
+class InventoryService:
+    def __init__(self, db: AsyncSession):
         self.db = db
         self.user_repo = UserRepository(db)
-        self.transaction_repo = PurchRepository(db)
-    
+        self.inventory_repo = InventoryRepository(db)
+
     async def buy_item(self, item_name: str, user_id: int):
         user = await self.user_repo.get_info(user_id)
         if not user:
             raise UserNotFoundError("Пользователь не найден")
 
-        item = await self.purch_repo.get_merch_by_name(item_name)
+        item = await self.inventory_repo.get_merch_by_name(item_name)
         if not item:
             raise ItemNotFoundError("Товар не найден")
 
-        await self.purch_repo.create_purchase(user_id, item.id)
+        inventory_item = await self.inventory_repo.get_user_item(
+            user_id=user_id,
+            merch_id=item.id
+        )
+
+        if inventory_item:
+            inventory_item.quantity += 1
+        else:
+            await self.inventory_repo.create_purchase(
+                user_id=user_id,
+                merch_id=item.id
+            )
 
         await self.db.commit()
 

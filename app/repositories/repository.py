@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from app.models.models import Users
-from app.models.models import Purchases
+from app.models.models import Inventory
 from app.models.models import Merch
 from app.models.models import Transactions
 
@@ -29,17 +29,47 @@ class UserRepository:
 
 
 
-class PurchRepository:
+class InventoryService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.user_repo = UserRepository(db)
+        self.inventory_repo = InventoryRepository(db)
 
-    async def get_merch_by_name(self, name: str):
-        return await self.db.scalar(
-            select(Merch).where(Merch.name == name)
+    async def buy_item(self, item_name: str, user_id: int):
+        user = await self.user_repo.get_info(user_id)
+        if not user:
+            raise UserNotFoundError("Пользователь не найден")
+
+        item = await self.inventory_repo.get_merch_by_name(item_name)
+        if not item:
+            raise ItemNotFoundError("Товар не найден")
+
+        inventory_item = await self.inventory_repo.get_user_item(
+            user_id=user_id,
+            merch_id=item.id
         )
-    async def create_purchase(self, user_id: int, merch_id: int):
-        purchase = Purchases(user_id=user_id, merch_id=merch_id)
-        self.db.add(purchase)
+
+        if inventory_item:
+            inventory_item.quantity += 1
+        else:
+            await self.inventory_repo.create_purchase(
+                user_id=user_id,
+                merch_id=item.id
+            )
+
+        await self.db.commit()
+
+    async def get_inventory(self, user_id:int):
+        result = await self.db.execute(
+            select(
+                Merch.name.label("type"),
+                Inventory.quantity.label("quantity")
+            )
+            .join(Merch, Inventory.merch_id == Merch.id)
+            .where(Inventory.user_id == user_id)
+        )
+
+        return result.all()
     
 
 class TransactionRepository:
@@ -54,3 +84,27 @@ class TransactionRepository:
         )
         self.db.add(transaction)
         return transaction
+    
+    async def get_history_from_user(self,user_id):
+        result = await self.db.execute(
+            select(
+                Users.username.label("toUser"),
+                Transactions.amount.label("amount")
+            )
+            .join(Users,Transactions.to_user_id == Users.id)
+            .where(Transactions.from_user_id == user_id)
+        )
+
+        return result.all()
+
+
+    async def get_history_to_user(self,user_id):
+        result = await self.db.execute(
+            select(
+                Users.username.label("fromUser"),
+                Transactions.amount.label("amount")
+            )
+            .join(Users,Transactions.from_user_id == Users.id)
+            .where(Transactions.to_user_id == user_id)
+        )
+        return result.all()
