@@ -2,7 +2,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.repository import UserRepository
 from app.repositories.repository import InventoryRepository
 from app.repositories.repository import TransactionRepository
-from services_errors import (UserNotFoundError, 
+from app.services.services_errors import (UserNotFoundError, 
                              NotEnoughCoinsError, 
                              SelfTransferError,
                              ItemNotFoundError
@@ -21,8 +21,47 @@ class UserService:
 
     async def get_user(self, user_id:int):
         user = await self.user_repo.get_by_id(user_id)
-        inventory = await self.inventory_repo.get_inventory(user_id)
-        transaction = ...
+
+        if not user:
+            raise UserNotFoundError("Пользователь не найден")
+        
+        inventory_rows = await self.inventory_repo.get_inventory(user_id)
+        sent_rows = await self.transaction_repo.get_history_from_user(user_id)
+        received_rows = await self.transaction_repo.get_history_to_user(user_id)
+
+
+        inventory = [
+            {
+                "type": row.type,
+                "quantity": row.quantity
+            }
+            for row in inventory_rows
+        ]
+
+        sent = [
+            {
+                "toUser": row.toUser,
+                "amount": row.amount
+            }
+            for row in sent_rows
+        ]
+
+        received = [
+            {
+                "fromUser": row.fromUser,
+                "amount": row.amount
+            }
+            for row in received_rows
+        ]
+
+        return {
+            "coins": user.coins,
+            "inventory": inventory,
+            "coinHistory": {
+                "received": received,
+                "sent": sent
+            }
+        }
 
 
 class TransactionService:
@@ -58,7 +97,7 @@ class TransactionService:
 
         await self.db.commit()
 
-# Исправить инвентарь!!!
+
 class InventoryService:
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -89,18 +128,3 @@ class InventoryService:
 
         await self.db.commit()
 
-
-
-
-
-
-
-
-class PurchService:
-    def __init__(self, db:AsyncSession):
-        self.db = db
-        self.user_repo = PurchRepository(db)
-    
-    async def buy_item(self, item_name: str, user_id: int):
-        
-        return await self.user_repo.buy_item(item_name,user_id)
