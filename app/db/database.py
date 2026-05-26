@@ -1,15 +1,19 @@
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from app.core.config import settings
 
 
 
 
+# DATABASE_URL = "sqlite+aiosqlite:///merch.db"
 
-DATABASE_URL = "sqlite+aiosqlite:///merch.db"
 
-
-engine = create_async_engine(DATABASE_URL)
+engine = create_async_engine(settings.DATABASE_URL)
 
 
 new_session = async_sessionmaker(engine, expire_on_commit = False)
 
+
+async def get_db():
+    async with new_session() as session:
+        yield session
 
