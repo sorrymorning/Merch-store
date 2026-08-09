@@ -1,0 +1,38 @@
+
+
+services:
+
+  app:
+    container_name: merch_app
+    build: ./
+    depends_on:
+      - db
+    
+    volumes:
+     - ./:/app
+    ports:
+      - ${APP_HOST_PORT}:8000
+    restart: always
+    env_file:
+      - .env
+
+  db:
+    container_name: merch_postgres
+    image: postgres:17
+
+    restart: always
+    
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRESS_DB_USER}
+      POSTGRES_PASSWORD: ${POSTGRESS_DB_PASSWORD}
+
+    ports:
+      - ${POSTGRESS_DB_HOST_PORT}:5432
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
