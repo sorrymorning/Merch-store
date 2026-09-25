@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.repository import UserRepository
 from app.repositories.repository import InventoryRepository
-from app.repositories.repository import TransactionRepository
+from app.repositories.repository import TransactionRepository, PurchaseHistoryRepository
 from app.services.services_errors import (UserNotFoundError, 
                              NotEnoughCoinsError, 
                              SelfTransferError,
@@ -62,6 +62,30 @@ class UserService:
                 "sent": sent
             }
         }
+    async def create_user(self, username: str, password: str):
+        existing_user = await self.user_repo.get_by_username(username)
+
+        if existing_user:
+            raise ValueError("Пользователь уже существует")
+
+        user = await self.user_repo.create(
+            username=username,
+            password_hash=password
+        )
+
+        await self.db.commit()
+
+        return user
+    async def authenticate_user(self, username: str, password: str):
+        user = await self.user_repo.get_by_username(username)
+
+        if not user:
+            raise UserNotFoundError("Неверный логин или пароль")
+
+        if user.password_hash != password:
+            raise ValueError("Неверный логин или пароль")
+
+        return user
 
 
 class TransactionService:
@@ -103,9 +127,10 @@ class InventoryService:
         self.db = db
         self.user_repo = UserRepository(db)
         self.inventory_repo = InventoryRepository(db)
+        self.purchase_history_repo = PurchaseHistoryRepository(db)
 
     async def buy_item(self, item_name: str, user_id: int):
-        user = await self.user_repo.get_info(user_id)
+        user = await self.user_repo.get_by_id(user_id)
         if not user:
             raise UserNotFoundError("Пользователь не найден")
 
@@ -126,5 +151,13 @@ class InventoryService:
                 merch_id=item.id
             )
 
+        await self.purchase_history_repo.create_purchase(
+            user_id=user_id,
+            merch_id=item.id,
+            quantity=1
+        )
+
         await self.db.commit()
+
+
 

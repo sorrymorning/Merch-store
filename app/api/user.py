@@ -29,40 +29,25 @@ class SendCoinRequest(BaseModel):
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
-
 class LoginRequest(BaseModel):
     username: str
     password: str
 
 
-# @router.post("/login")
-# async def login(data: LoginRequest):
-#     if data.username != "admin" or data.password != "1234":
-#         raise HTTPException(status_code=401, detail="Invalid credentials")
-
-#     token = jwt.encode(
-#         {"user_id": 1},
-#         SECRET_KEY,
-#         algorithm=ALGORITHM
-#     )
-
-#     return {
-#         "access_token": token,
-#         "token_type": "bearer"
-#     }
-
-
 @router.post("/login")
-async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+async def login(
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: AsyncSession = Depends(get_db)
+):
+    service = UserService(db)
 
-    if form_data.username != "admin" or form_data.password != "1234":
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials"
-        )
+    user = await service.authenticate_user(
+        username=form_data.username,
+        password=form_data.password
+    )
 
     token = jwt.encode(
-        {"user_id": 1},
+        {"user_id": user.id},
         SECRET_KEY,
         algorithm=ALGORITHM
     )
@@ -71,6 +56,28 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         "access_token": token,
         "token_type": "bearer"
     }
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+
+@router.post("/register")
+async def register(
+    data: RegisterRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    service = UserService(db)
+
+    user = await service.create_user(
+        username=data.username,
+        password=data.password
+    )
+
+    return {
+        "id": user.id,
+        "username": user.username
+    }
+
 
 async def get_current_user_id(token: str = Depends(oauth2_scheme)):
     payload = decode_jwt(token)

@@ -4,8 +4,7 @@ from app.models.models import Users
 from app.models.models import Inventory
 from app.models.models import Merch
 from app.models.models import Transactions
-
-
+from app.models.models import PurchaseHistory
 
 
 class UserRepository:
@@ -24,42 +23,45 @@ class UserRepository:
     async def update(self, user: Users):
         self.db.add(user)
 
-
-
-
-
-
-class InventoryService:
-    def __init__(self, db: AsyncSession):
-        self.db = db
-        self.user_repo = UserRepository(db)
-        self.inventory_repo = InventoryRepository(db)
-
-    async def buy_item(self, item_name: str, user_id: int):
-        user = await self.user_repo.get_info(user_id)
-        if not user:
-            raise UserNotFoundError("Пользователь не найден")
-
-        item = await self.inventory_repo.get_merch_by_name(item_name)
-        if not item:
-            raise ItemNotFoundError("Товар не найден")
-
-        inventory_item = await self.inventory_repo.get_user_item(
-            user_id=user_id,
-            merch_id=item.id
+    async def create(self, username: str, password_hash: str):
+        user = Users(
+            username=username,
+            password_hash=password_hash,
+            coins=1000
         )
 
-        if inventory_item:
-            inventory_item.quantity += 1
-        else:
-            await self.inventory_repo.create_purchase(
-                user_id=user_id,
-                merch_id=item.id
+        self.db.add(user)
+        await self.db.flush()
+
+        return user
+
+
+class InventoryRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def get_merch_by_name(self, name: str):
+        return await self.db.scalar(
+            select(Merch).where(Merch.name == name)
+        )
+
+    async def get_user_item(self, user_id: int, merch_id: int):
+        return await self.db.scalar(
+            select(Inventory).where(
+                Inventory.user_id == user_id,
+                Inventory.merch_id == merch_id
             )
+        )
 
-        await self.db.commit()
-
-    async def get_inventory(self, user_id:int):
+    async def create_purchase(self, user_id: int, merch_id: int):
+        purchase = Inventory(
+            user_id=user_id,
+            merch_id=merch_id,
+            quantity=1
+        )
+        self.db.add(purchase)
+    
+    async def get_inventory(self, user_id: int):
         result = await self.db.execute(
             select(
                 Merch.name.label("type"),
@@ -68,7 +70,6 @@ class InventoryService:
             .join(Merch, Inventory.merch_id == Merch.id)
             .where(Inventory.user_id == user_id)
         )
-
         return result.all()
     
 
@@ -108,3 +109,24 @@ class TransactionRepository:
             .where(Transactions.to_user_id == user_id)
         )
         return result.all()
+
+class PurchaseHistoryRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create_purchase(
+        self,
+        user_id: int,
+        merch_id: int,
+        quantity: int = 1
+    ):
+        purchase = PurchaseHistory(
+            user_id=user_id,
+            merch_id=merch_id,
+            quantity=quantity
+        )
+
+        self.db.add(purchase)
+        await self.db.flush()
+
+        return purchase
