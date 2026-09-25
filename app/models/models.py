@@ -1,8 +1,15 @@
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
-from sqlalchemy import ForeignKey
+from sqlalchemy import ForeignKey, DateTime
 from typing import List
 
+from datetime import datetime,UTC
+
+
 # настроить realtionship
+class Model(DeclarativeBase):
+    pass
+
+
 class Model(DeclarativeBase):
     pass
 
@@ -14,7 +21,7 @@ class Users(Model):
     password_hash: Mapped[str]
     coins: Mapped[int] = mapped_column(default = 0)
 
-    purchases: Mapped[List["Purchases"]] = relationship(back_populates="user")
+    purchases: Mapped[List["Inventory"]] = relationship(back_populates="user")
     
     sent_transactions: Mapped[List["Transactions"]] = relationship(
         foreign_keys="Transactions.from_user_id",
@@ -24,7 +31,9 @@ class Users(Model):
         foreign_keys="Transactions.to_user_id",
         back_populates="to_user"
     )
-
+    purchase_history: Mapped[List["PurchaseHistory"]] = relationship(
+        back_populates="user"
+    )
 
 
 class Merch(Model):
@@ -33,9 +42,12 @@ class Merch(Model):
     name: Mapped[str]
     price: Mapped[int]
 
-    purchases: Mapped[List["Purchases"]] = relationship(back_populates="item")
+    purchases: Mapped[List["Inventory"]] = relationship(back_populates="item")
+    purchase_history: Mapped[List["PurchaseHistory"]] = relationship(
+        back_populates="item"
+    )
 
-class Purchases(Model):
+class Inventory(Model):
     __tablename__ = "purchases"
     id: Mapped[int]  = mapped_column(primary_key = True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
@@ -63,7 +75,30 @@ class Transactions(Model):
     )
 
 
+class PurchaseHistory(Model):
+    __tablename__ = "purchase_history"
 
+    id: Mapped[int] = mapped_column(primary_key=True)
+
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id")
+    )
+
+    merch_id: Mapped[int] = mapped_column(
+        ForeignKey("merch.id")
+    )
+
+    quantity: Mapped[int] = mapped_column(default=1)
+
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(UTC))
+
+    user: Mapped["Users"] = relationship(
+        back_populates="purchase_history"
+    )
+
+    item: Mapped["Merch"] = relationship(
+        back_populates="purchase_history"
+    )
 
 
 
