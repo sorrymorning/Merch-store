@@ -8,7 +8,11 @@ class ItemNotFoundError(Exception):
 class NotEnoughCoinsError(Exception):
     pass
 
+class UserAlreadyExistsError(Exception):
+    pass
 
+class InvalidCredentialsError(Exception):
+    pass
 
 class SelfTransferError(Exception):
     pass

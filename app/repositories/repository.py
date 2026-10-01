@@ -14,12 +14,28 @@ class UserRepository:
     async def get_by_id(self, user_id: int):
         return await self.db.get(Users, user_id)
     
+    async def get_by_id_for_update(self, user_id: int):
+        result = await self.db.execute(
+            select(Users)
+            .where(Users.id == user_id)
+            .with_for_update() 
+        )
+        return result.scalars().first()
+
     async def get_by_username(self, username: str):
         result = await self.db.execute(
             select(Users).where(Users.username == username)
         )
         return result.scalar_one_or_none()
-
+    
+    async def get_by_username_for_update(self, username: str):
+        result = await self.db.execute(
+            select(Users)
+            .where(Users.username == username)
+            .with_for_update()
+        )
+        return result.scalars().first()
+   
     async def update(self, user: Users):
         self.db.add(user)
 

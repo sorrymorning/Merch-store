@@ -1,3 +1,4 @@
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.repository import UserRepository
 from app.repositories.repository import InventoryRepository
@@ -5,10 +6,12 @@ from app.repositories.repository import TransactionRepository, PurchaseHistoryRe
 from app.services.services_errors import (UserNotFoundError, 
                              NotEnoughCoinsError, 
                              SelfTransferError,
-                             ItemNotFoundError
+                             ItemNotFoundError,
+                             UserAlreadyExistsError,
+                             InvalidCredentialsError
                                 )
 
-
+    
 
 
 
@@ -24,49 +27,27 @@ class UserService:
 
         if not user:
             raise UserNotFoundError("Пользователь не найден")
+        inventory_rows, sent_rows, received_rows = await asyncio.gather( self.inventory_repo.get_inventory(user_id),
+            self.transaction_repo.get_history_from_user(user_id),
+            self.transaction_repo.get_history_to_user(user_id)
+        )
         
-        inventory_rows = await self.inventory_repo.get_inventory(user_id)
-        sent_rows = await self.transaction_repo.get_history_from_user(user_id)
-        received_rows = await self.transaction_repo.get_history_to_user(user_id)
-
-
-        inventory = [
-            {
-                "type": row.type,
-                "quantity": row.quantity
-            }
-            for row in inventory_rows
-        ]
-
-        sent = [
-            {
-                "toUser": row.toUser,
-                "amount": row.amount
-            }
-            for row in sent_rows
-        ]
-
-        received = [
-            {
-                "fromUser": row.fromUser,
-                "amount": row.amount
-            }
-            for row in received_rows
-        ]
-
         return {
             "coins": user.coins,
-            "inventory": inventory,
+            "inventory": [
+                {"type": row.type, "quantity": row.quantity} for row in inventory_rows
+            ],
             "coinHistory": {
-                "received": received,
-                "sent": sent
+                "received": [{"fromUser": row.fromUser, "amount": row.amount} for row in received_rows],
+                "sent": [{"toUser": row.toUser, "amount": row.amount} for row in sent_rows]
             }
         }
+
     async def create_user(self, username: str, password: str):
         existing_user = await self.user_repo.get_by_username(username)
 
         if existing_user:
-            raise ValueError("Пользователь уже существует")
+            raise UserAlreadyExistsError("Пользователь уже существует")
 
         user = await self.user_repo.create(
             username=username,
@@ -76,6 +57,7 @@ class UserService:
         await self.db.commit()
 
         return user
+    
     async def authenticate_user(self, username: str, password: str):
         user = await self.user_repo.get_by_username(username)
 
@@ -83,7 +65,7 @@ class UserService:
             raise UserNotFoundError("Неверный логин или пароль")
 
         if user.password_hash != password:
-            raise ValueError("Неверный логин или пароль")
+            raise InvalidCredentialsError("Неверный логин или пароль")
 
         return user
 
@@ -95,31 +77,30 @@ class TransactionService:
         self.transaction_repo = TransactionRepository(db)
     
     async def send_coin(self, from_user_id: int, to_username: str, amount: int):
-        sender = await self.user_repo.get_by_id(from_user_id)
-        receiver = await self.user_repo.get_by_username(to_username)
+        if amount <= 0:
+            raise InvalidAmountError("Сумма должна быть больше нуля")
 
-        if not sender:
-            raise UserNotFoundError("Отправитель не найден")
+        async with self.db.begin():
+            sender = await self.user_repo.get_by_id_for_update(from_user_id)
+            receiver = await self.user_repo.get_by_username_for_update(to_username)
 
-        if not receiver:
-            raise UserNotFoundError("Получатель не найден")
+            if not sender:
+                raise UserNotFoundError("Отправитель не найден")
+            if not receiver:
+                raise UserNotFoundError("Получатель не найден")
+            if sender.id == receiver.id:
+                raise SelfTransferError("Нельзя отправить самому себе")
+            if sender.coins < amount:
+                raise NotEnoughCoinsError("Недостаточно средств")
 
-        if sender.coins < amount:
-            raise NotEnoughCoinsError("Недостаточно средств")
+            sender.coins -= amount
+            receiver.coins += amount
 
-        if sender.id == receiver.id:
-            raise SelfTransferError("Нельзя отправить самому себе")
-
-        sender.coins -= amount
-        receiver.coins += amount
-
-        await self.transaction_repo.create(
-            from_user_id=sender.id,
-            to_user_id=receiver.id,
-            amount=amount
-        )
-
-        await self.db.commit()
+            await self.transaction_repo.create(
+                from_user_id=sender.id,
+                to_user_id=receiver.id,
+                amount=amount
+            )
 
 
 class InventoryService:
