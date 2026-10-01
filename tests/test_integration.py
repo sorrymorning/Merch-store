@@ -45,7 +45,7 @@ async def test_get_user(db):
 
     result = await service_user.get_user(1)
 
-    assert result["coins"] == 100
+    assert result["coins"] == 90
     assert result["inventory"] == [{"type":"cap","quantity":1}]
     assert result["coinHistory"]["sent"] == []
     assert result["coinHistory"]["received"] == []

@@ -61,14 +61,17 @@ class InventoryRepository:
             select(Merch).where(Merch.name == name)
         )
 
-    async def get_user_item(self, user_id: int, merch_id: int):
-        return await self.db.scalar(
-            select(Inventory).where(
+    async def get_user_item_for_update(self, user_id: int, merch_id: int):
+        result = await self.db.execute(
+            select(Inventory)
+            .where(
                 Inventory.user_id == user_id,
                 Inventory.merch_id == merch_id
             )
+            .with_for_update()
         )
-
+        return result.scalars().first()
+ 
     async def create_purchase(self, user_id: int, merch_id: int):
         purchase = Inventory(
             user_id=user_id,
