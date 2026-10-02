@@ -53,7 +53,6 @@ class UserService:
             username=username,
             password_hash=password
         )
-
         await self.db.commit()
 
         return user
