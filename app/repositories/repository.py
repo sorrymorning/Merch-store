@@ -47,7 +47,6 @@ class UserRepository:
         )
 
         self.db.add(user)
-        await self.db.flush()
         return user
 
 
@@ -145,6 +144,5 @@ class PurchaseHistoryRepository:
         )
 
         self.db.add(purchase)
-        await self.db.flush()
 
         return purchase
