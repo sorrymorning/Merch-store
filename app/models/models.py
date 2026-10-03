@@ -5,19 +5,14 @@ from typing import List
 from datetime import datetime,UTC
 
 
-# настроить realtionship
 class Model(DeclarativeBase):
     pass
-
-
-class Model(DeclarativeBase):
-    pass
-
 
 class Users(Model):
     __tablename__ = "users"
+
     id: Mapped[int] = mapped_column(primary_key = True)
-    username: Mapped[str]
+    username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     password_hash: Mapped[str]
     coins: Mapped[int] = mapped_column(default = 0)
 
@@ -38,6 +33,7 @@ class Users(Model):
 
 class Merch(Model):
     __tablename__ = "merch"
+
     id: Mapped[int] = mapped_column(primary_key = True)
     name: Mapped[str]
     price: Mapped[int]
@@ -49,10 +45,15 @@ class Merch(Model):
 
 class Inventory(Model):
     __tablename__ = "purchases"
+
     id: Mapped[int]  = mapped_column(primary_key = True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     merch_id: Mapped[int] = mapped_column(ForeignKey("merch.id"))
     quantity: Mapped[int] = mapped_column(default = 1)
+
+    __table_args__ = (
+        Index("idx_user_inventory", "user_id", "merch_id"),
+    )
 
     user: Mapped["Users"] = relationship(back_populates="purchases")
     item: Mapped["Merch"] = relationship(back_populates="purchases")
@@ -60,6 +61,7 @@ class Inventory(Model):
 
 class Transactions(Model):
     __tablename__ = "transactions"
+    
     id: Mapped[int] = mapped_column(primary_key = True)
     from_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
     to_user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
@@ -90,7 +92,10 @@ class PurchaseHistory(Model):
 
     quantity: Mapped[int] = mapped_column(default=1)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now(UTC))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        default=datetime.now(UTC)
+    )
 
     user: Mapped["Users"] = relationship(
         back_populates="purchase_history"
