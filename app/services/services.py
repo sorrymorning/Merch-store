@@ -1,8 +1,10 @@
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.repositories.repository import UserRepository
-from app.repositories.repository import InventoryRepository
-from app.repositories.repository import TransactionRepository, PurchaseHistoryRepository
+from app.repositories.repository import (UserRepository,
+                                        InventoryRepository,
+                                        TransactionRepository,
+                                        PurchaseHistoryRepository,
+                                        MerchRepository)
 from app.services.services_errors import (UserNotFoundError, 
                              NotEnoughCoinsError, 
                              SelfTransferError,
@@ -10,10 +12,8 @@ from app.services.services_errors import (UserNotFoundError,
                              UserAlreadyExistsError,
                              InvalidCredentialsError
                                 )
-
-    
-
-
+from app.cache.cache import RedisCache, redis_cache
+import json
 
 class UserService:
     def __init__(self, db:AsyncSession):
@@ -68,6 +68,54 @@ class UserService:
 
         return user
 
+class MerchService:
+    def __init__(self,db: AsyncSession, cache: RedisCache = redis_cache):
+        self.db = db
+        self.merch_repo = MerchRepository(db)
+        self.cache = redis_cache
+
+
+    async def create_merch(self, merch_name:str, merch_price:int):
+        merch = await self.merch_repo.create_merch(
+            merch_name = merch_name,
+            merch_price = merch_price
+        )
+        await self.db.commit()
+
+        return merch
+
+    async def get_merch_by_name(self, name: str) -> dict | None:
+        cache_key = f"merch:{name}"
+
+
+        cached_data = await self.cache.get(cache_key)
+
+
+        if cached_data:
+            return json.loads(cached_data)
+
+
+        merch = await self.merch_repo.get_merch_by_name(name)
+
+
+        if not merch:
+            return None
+
+        merch_dict = {
+            "id": merch.id,
+            "name": merch.name,
+            "price": merch.price
+        }
+
+
+        await self.cache.set(
+            cache_key,
+            json.dumps(merch_dict)
+        )
+
+
+        return merch
+    
 
 class TransactionService:
     def __init__(self, db:AsyncSession):
@@ -107,6 +155,7 @@ class InventoryService:
         self.db = db
         self.user_repo = UserRepository(db)
         self.inventory_repo = InventoryRepository(db)
+        self.merch_service = MerchService(db=self.db)
         self.purchase_history_repo = PurchaseHistoryRepository(db)
 
     async def buy_item(self, item_name: str, user_id: int):
@@ -116,8 +165,8 @@ class InventoryService:
             if not user:
                 raise UserNotFoundError("Пользователь не найден")
 
-            item = await self.inventory_repo.get_merch_by_name(item_name)
-            
+            item = await self.merch_service.get_merch_by_name(item_name)
+
             if not item:
                 raise ItemNotFoundError("Товар не найден")
 

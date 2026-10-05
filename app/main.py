@@ -8,8 +8,17 @@ from app.services.services_errors import (UserNotFoundError,
                                             ItemNotFoundError
                                         )
 
+from contextlib import asynccontextmanager
+from app.cache.cache import redis_cache
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await redis_cache.init()
+    yield
+    await redis_cache.close()
+
+
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(user_router)
 

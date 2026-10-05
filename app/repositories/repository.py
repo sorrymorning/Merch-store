@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select 
+from sqlalchemy import select, delete 
 
 from app.models.models import (
     Inventory,
@@ -49,15 +49,32 @@ class UserRepository:
         self.db.add(user)
         return user
 
-
-class InventoryRepository:
+class MerchRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def create_merch(self, merch_name:str, merch_price: int) -> Merch:
+        merch = Merch(
+            name = merch_name,
+            price = merch_price
+        )
+        self.db.add(merch)
+        return merch
+    
     async def get_merch_by_name(self, name: str):
         return await self.db.scalar(
             select(Merch).where(Merch.name == name)
         )
+
+    async def delete_merch(self, merch_name:str):
+        self.db.execute(
+            delete(Merch)
+            .where(Merch.name == merch_name)
+        )
+class InventoryRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
 
     async def get_user_item_for_update(self, user_id: int, merch_id: int) -> Inventory | None:
         return await self.db.scalar(

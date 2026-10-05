@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
-from sqlalchemy import ForeignKey, DateTime
+from sqlalchemy import ForeignKey, DateTime, String, Index
 from typing import List
 
 from datetime import datetime,UTC
@@ -47,7 +47,7 @@ class Inventory(Model):
     __tablename__ = "purchases"
 
     id: Mapped[int]  = mapped_column(primary_key = True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     merch_id: Mapped[int] = mapped_column(ForeignKey("merch.id"))
     quantity: Mapped[int] = mapped_column(default = 1)
 
