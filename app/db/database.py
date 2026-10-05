@@ -3,10 +3,6 @@ from app.core.config import settings
 
 
 
-
-# DATABASE_URL = "sqlite+aiosqlite:///merch.db"
-
-
 engine = create_async_engine(settings.DATABASE_URL)
 
 
