@@ -14,9 +14,6 @@ class UserAlreadyExistsError(Exception):
 class InvalidCredentialsError(Exception):
     pass
 
-class NotEnoughCoinsError(Exception):
-    pass
-
 class SelfTransferError(Exception):
     pass
 
