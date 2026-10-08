@@ -20,3 +20,5 @@ class NotEnoughCoinsError(Exception):
 class SelfTransferError(Exception):
     pass
 
+class InvalidAmountError(Exception):
+    pass
