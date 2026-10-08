@@ -141,7 +141,7 @@ async def add_item(
 ):
     service = MerchService(db)
 
-    await service.create_item(
+    await service.create_merch(
         merch_name=item.merch_name,
         merch_price=item.merch_price
     )
