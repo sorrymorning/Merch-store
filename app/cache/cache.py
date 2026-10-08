@@ -16,8 +16,6 @@ class RedisCache:
         if self.redis is None:
             self.redis = redis.from_url(self._redis_url, decode_responses=True)
 
-            print("REDIS URL:", self._redis_url)
-            print("REDIS PING:", await self.redis.ping())
 
     async def close(self):
         """Закрытие соединений при остановке"""
@@ -34,11 +32,9 @@ class RedisCache:
             raise RuntimeError("RedisCache не инициализирован! Вызовите await cache.init()")
         expire = ttl if ttl is not None else self.default_ttl
         result = await self.redis.set(name=key, value=value, ex=expire)
-        print("REDIS SET RESULT:", result)
 
         check = await self.redis.get(key)
 
-        print("REDIS GET AFTER SET:", check)
 
 
 redis_cache = RedisCache(redis_url=settings.REDIS_URL)
