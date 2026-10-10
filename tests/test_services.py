@@ -79,7 +79,7 @@ class TestInventoryService:
         fake_inventory = type("Inventory", (), {"quantity": 2})()
 
         service.user_repo.get_by_id_for_update = AsyncMock(return_value=fake_user)
-        service.merch_repo.get_merch_by_name = AsyncMock(return_value=fake_item)
+        service.merch_service.get_merch_by_name = AsyncMock(return_value=fake_item)
         service.inventory_repo.get_user_item_for_update= AsyncMock(return_value=fake_inventory)
         service.inventory_repo.create_purchase = AsyncMock()
         service.purchase_history_repo.create_purchase = AsyncMock()
@@ -101,7 +101,7 @@ class TestInventoryService:
         fake_inventory = type("Inventory", (), {"quantity": 2})()
 
         service.user_repo.get_by_id_for_update = AsyncMock(return_value=fake_user)
-        service.merch_repo.get_merch_by_name = AsyncMock(return_value=fake_item)
+        service.merch_service.get_merch_by_name = AsyncMock(return_value=fake_item)
         service.inventory_repo.get_user_item_for_update = AsyncMock(return_value=None)
         service.inventory_repo.create_purchase = AsyncMock()
         service.purchase_history_repo.create_purchase = AsyncMock()
@@ -130,7 +130,7 @@ class TestInventoryService:
         fake_user = type("User", (), {"id": 1})()
         service.user_repo.get_by_id_for_update = AsyncMock(return_value=fake_user)
 
-        service.merch_repo.get_merch_by_name = AsyncMock(return_value=None)
+        service.merch_service.get_merch_by_name = AsyncMock(return_value=None)
 
         db.begin = MagicMock(return_value=AsyncMock())
         with pytest.raises(ItemNotFoundError):
