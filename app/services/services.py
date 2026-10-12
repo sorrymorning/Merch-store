@@ -14,6 +14,13 @@ from app.services.services_errors import (UserNotFoundError,
                                 )
 from app.cache.cache import RedisCache, redis_cache
 import json
+import logging
+
+
+
+logger = logging.getLogger(__name__)
+
+
 
 class UserService:
     def __init__(self, db:AsyncSession):
@@ -26,12 +33,13 @@ class UserService:
         user = await self.user_repo.get_by_id(user_id)
 
         if not user:
+            logger.info("User with id: %s. Not Found",user_id)
             raise UserNotFoundError("Пользователь не найден")
         inventory_rows, sent_rows, received_rows = await asyncio.gather( self.inventory_repo.get_inventory(user_id),
             self.transaction_repo.get_history_from_user(user_id),
             self.transaction_repo.get_history_to_user(user_id)
         )
-        
+        logger.info("User information successfully retrieved: %s",user_id)
         return {
             "coins": user.coins,
             "inventory": [
@@ -47,6 +55,7 @@ class UserService:
         existing_user = await self.user_repo.get_by_username(username)
 
         if existing_user:
+            logger.warning("Registration attempt with existing username: %s", username)
             raise UserAlreadyExistsError("Пользователь уже существует")
 
         user = await self.user_repo.create(
@@ -54,18 +63,21 @@ class UserService:
             password_hash=password
         )
         await self.db.commit()
-
+        logger.info("Successfully created user: %s",user.id)
         return user
     
     async def authenticate_user(self, username: str, password: str):
         user = await self.user_repo.get_by_username(username)
 
         if not user:
+            logger.warning("Authentication failed: user not found for username=%s", username)
             raise UserNotFoundError("Неверный логин или пароль")
 
         if user.password_hash != password:
+            logger.warning("Authentication failed: invalid password for user_id=%s", user.id)
             raise InvalidCredentialsError("Неверный логин или пароль")
 
+        logger.info("Authentication succes for user_id: %s",user.id)
         return user
 
 class MerchService:
@@ -81,22 +93,18 @@ class MerchService:
             merch_price = merch_price
         )
         await self.db.commit()
-
+        logger.info("Successfully created merch: %s",merch_name)
         return merch
 
     async def get_merch_by_name(self, name: str) -> dict | None:
         cache_key = f"merch:{name}"
 
-
         cached_data = await self.cache.get(cache_key)
-
 
         if cached_data:
             return json.loads(cached_data)
 
-
         merch = await self.merch_repo.get_merch_by_name(name)
-
 
         if not merch:
             return None
@@ -107,13 +115,11 @@ class MerchService:
             "price": merch.price
         }
 
-
         await self.cache.set(
             cache_key,
             json.dumps(merch_dict)
         )
-
-
+        logger.info("Successfully got merch: %s", name)
         return merch
     
 
@@ -125,29 +131,54 @@ class TransactionService:
     
     async def send_coin(self, from_user_id: int, to_username: str, amount: int):
         if amount <= 0:
+            logger.warning("Invalid coin amount attempt: amount=%s", amount)
             raise InvalidAmountError("Сумма должна быть больше нуля")
+        try:
+            async with self.db.begin():
+                sender = await self.user_repo.get_by_id_for_update(from_user_id)
+                receiver = await self.user_repo.get_by_username_for_update(to_username)
 
-        async with self.db.begin():
-            sender = await self.user_repo.get_by_id_for_update(from_user_id)
-            receiver = await self.user_repo.get_by_username_for_update(to_username)
+                if not sender:
+                    logger.warning("Transfer failed: sender not found, user_id=%s", from_user_id)
+                    raise UserNotFoundError("Отправитель не найден")
+                if not receiver:
+                    logger.warning("Transfer failed: receiver not found, username=%s", to_username)
+                    raise UserNotFoundError("Получатель не найден")
+                if sender.id == receiver.id:
+                    logger.warning("Self-transfer attempt blocked for user_id=%s", from_user_id)
+                    raise SelfTransferError("Нельзя отправить самому себе")
+                if sender.coins < amount:
+                    logger.warning(
+                        "Not enough coins for transfer: user_id=%s, has=%s, needed=%s",
+                        sender.id,
+                        sender.coins,
+                        amount,
+                    )
+                    raise NotEnoughCoinsError("Недостаточно средств")
 
-            if not sender:
-                raise UserNotFoundError("Отправитель не найден")
-            if not receiver:
-                raise UserNotFoundError("Получатель не найден")
-            if sender.id == receiver.id:
-                raise SelfTransferError("Нельзя отправить самому себе")
-            if sender.coins < amount:
-                raise NotEnoughCoinsError("Недостаточно средств")
+                sender.coins -= amount
+                receiver.coins += amount
 
-            sender.coins -= amount
-            receiver.coins += amount
+                await self.transaction_repo.create(
+                    from_user_id=sender.id,
+                    to_user_id=receiver.id,
+                    amount=amount
+                )
 
-            await self.transaction_repo.create(
-                from_user_id=sender.id,
-                to_user_id=receiver.id,
-                amount=amount
+                logger.info(
+                    "Coins successfully transferred: from_user_id=%s, to_user_id=%s, amount=%s",
+                    sender.id,
+                    receiver.id,
+                    amount
+                )
+        except Exception:
+            logger.exception(
+                "Unexpected error during coin transfer: from_user_id=%s, to_username=%s, amount=%s",
+                from_user_id,
+                to_username,
+                amount,
             )
+            raise
 
 
 class InventoryService:
@@ -159,40 +190,76 @@ class InventoryService:
         self.purchase_history_repo = PurchaseHistoryRepository(db)
 
     async def buy_item(self, item_name: str, user_id: int):
-        async with self.db.begin():
-            user = await self.user_repo.get_by_id_for_update(user_id)
-            
-            if not user:
-                raise UserNotFoundError("Пользователь не найден")
+        try:
+            async with self.db.begin():
+                user = await self.user_repo.get_by_id_for_update(user_id)
+                
+                if not user:
+                    logger.warning("Purchase failed: user not found, user_id=%s", user_id)
+                    raise UserNotFoundError("Пользователь не найден")
 
-            item = await self.merch_service.get_merch_by_name(item_name)
+                item = await self.merch_service.get_merch_by_name(item_name)
 
-            if not item:
-                raise ItemNotFoundError("Товар не найден")
+                if not item:
+                    logger.warning("Purchase failed: item not found, item_name=%s", item_name)
+                    raise ItemNotFoundError("Товар не найден")
 
-            if user.coins < item.price:
-                raise NotEnoughCoinsError("Недостаточно средств для покупки")
+                if user.coins < item.price:
+                    logger.warning(
+                        "Not enough coins to buy item: user_id=%s, item=%s, price=%s, balance=%s",
+                        user_id,
+                        item.name,
+                        item.price,
+                        user.coins
+                    )
+                    raise NotEnoughCoinsError("Недостаточно средств для покупки")
 
-            user.coins -= item.price
+                user.coins -= item.price
 
-            inventory_item = await self.inventory_repo.get_user_item_for_update(
-                user_id=user_id,
-                merch_id=item.id
-            )
-
-            if inventory_item:
-                inventory_item.quantity += 1
-            else:
-                await self.inventory_repo.create_purchase(
+                inventory_item = await self.inventory_repo.get_user_item_for_update(
                     user_id=user_id,
                     merch_id=item.id
                 )
 
-            await self.purchase_history_repo.create_purchase(
-                user_id=user_id,
-                merch_id=item.id,
-                quantity=1
+                if inventory_item:
+                    inventory_item.quantity += 1
+                    logger.info(
+                        "Increased item quantity in inventory: user_id=%s, merch_id=%s, new_qty=%s",
+                        user_id,
+                        item.id,
+                        inventory_item.quantity,
+                    )
+                else:
+                    await self.inventory_repo.create_purchase(
+                        user_id=user_id,
+                        merch_id=item.id
+                    )
+                    logger.info(
+                        "Created new inventory record: user_id=%s, merch_id=%s",
+                        user_id,
+                        item.id,
+                    )
+
+                await self.purchase_history_repo.create_purchase(
+                    user_id=user_id,
+                    merch_id=item.id,
+                    quantity=1
+                )
+                
+                logger.info(
+                    "Purchase completed successfully: user_id=%s, item=%s, price=%s",
+                    user_id,
+                    item.name,
+                    item.price,
+                )
+        except Exception:
+            logger.exception(
+                "Unexpected error during buy item: user_id=%s, item=%s, price=%s",
+                user_id,
+                item.name,
+                item.price,
             )
+            raise
 
 
 
