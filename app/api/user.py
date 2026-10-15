@@ -39,7 +39,7 @@ def decode_jwt(token: str):
         return payload
     except JWTError:
         raise HTTPException(
-            status_code=status_code=status.HTTP_401_UNAUTHORIZED,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token"
         )
 
@@ -86,7 +86,7 @@ async def login(
     }
 
 
-@router.post("/register", , status_code=status.HTTP_201_CREATED)
+@router.post("/register",status_code=status.HTTP_201_CREATED)
 async def register(
     data: RegisterRequest,
     db: AsyncSession = Depends(get_db)
