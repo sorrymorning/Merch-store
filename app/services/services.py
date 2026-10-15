@@ -254,10 +254,9 @@ class InventoryService:
                 )
         except Exception:
             logger.exception(
-                "Unexpected error during buy item: user_id=%s, item=%s, price=%s",
+                "Unexpected error during buy item: user_id=%s, item=%s",
                 user_id,
-                item.name,
-                item.price,
+                item_name
             )
             raise
 

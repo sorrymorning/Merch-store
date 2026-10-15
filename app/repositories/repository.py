@@ -67,7 +67,7 @@ class MerchRepository:
         )
 
     async def delete_merch(self, merch_name:str):
-        self.db.execute(
+        await self.db.execute(
             delete(Merch)
             .where(Merch.name == merch_name)
         )
