@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column, DeclarativeBase, relationship
-from sqlalchemy import ForeignKey, DateTime, String, Index
+from sqlalchemy import ForeignKey, DateTime, String, Index, CheckConstraint, UniqueConstraint
 from typing import List
 
 from datetime import datetime,UTC
