@@ -24,12 +24,12 @@ class RedisCache:
 
     async def get(self, key: str) -> str | None:
         if not self.redis:
-            raise RuntimeError("RedisCache не инициализирован! Вызовите await cache.init()")
+            return None
         return await self.redis.get(key)
 
     async def set(self, key: str, value: str, ttl: int | None = None) -> None:
         if not self.redis:
-            raise RuntimeError("RedisCache не инициализирован! Вызовите await cache.init()")
+            return None
         expire = ttl if ttl is not None else self.default_ttl
         result = await self.redis.set(name=key, value=value, ex=expire)
 
