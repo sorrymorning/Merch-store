@@ -7,12 +7,13 @@ from app.services.services_errors import (UserNotFoundError,
                                             SelfTransferError,
                                             ItemNotFoundError
                                         )
-
+from app.core.logger import setup_logging
 from contextlib import asynccontextmanager
 from app.cache.cache import redis_cache
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
     await redis_cache.init()
     yield
     await redis_cache.close()
@@ -21,7 +22,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 app.include_router(user_router)
-
 
 @app.get("/health", tags=["Health"])
 async def health():
