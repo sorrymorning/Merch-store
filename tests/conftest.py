@@ -3,11 +3,13 @@ from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from app.models.models import Model
 import pytest_asyncio
-
+from httpx import ASGITransport, AsyncClient
 from app.core.config import Settings
-
+from app.main import app
+from app.db.database import get_db
 from app.services.services import UserService, InventoryService, TransactionService, MerchService
 from app.cache.cache import RedisCache
+
 test_settings = Settings(
     _env_file=".env.test"
 )
@@ -31,6 +33,22 @@ async def db():
     async with test_engine.begin() as conn:
         await conn.run_sync(Model.metadata.drop_all)
 
+
+@pytest_asyncio.fixture
+async def client():
+    async def override_get_db():
+        async with TestSessionLocal() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://test",
+    ) as client:
+        yield client
+
+    app.dependency_overrides.clear()
 
 # Фикстура для имитации базы данных (AsyncSession / условный db)
 @pytest.fixture
@@ -93,3 +111,17 @@ def transaction_service(mock_db):
     service.user_repo = AsyncMock()
     service.transaction_repo = AsyncMock()
     return service
+
+
+async def get_test_token(client, username: str) -> str:
+    response = await client.post(
+        "/api/login",
+        data={
+            "username": username,
+            "password": "test_hash",
+        },
+    )
+
+    assert response.status_code == 200
+
+    return response.json()["access_token"]
