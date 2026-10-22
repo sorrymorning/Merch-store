@@ -23,24 +23,40 @@ logger = logging.getLogger(__name__)
 
 
 class UserService:
-    def __init__(self, db:AsyncSession):
+    def __init__(self, db:AsyncSession, cache: RedisCache = redis_cache):
         self.db = db
         self.user_repo = UserRepository(db)
         self.transaction_repo = TransactionRepository(db)
         self.inventory_repo = InventoryRepository(db)
+        self.cache = redis_cache
 
     async def get_user(self, user_id:int):
+        cache_key = f"user:info:{user_id}"
+
+        cached_user = await self.cache.get(cache_key)
+        if cached_user is not None:
+            return cached_user
+
+        user = await self.user_repo.get_by_id(user_id)
+
+        if not user:
+            logger.info("User with id: %s. Not Found", user_id)
+            raise UserNotFoundError("Пользователь не найден")
+
         user = await self.user_repo.get_by_id(user_id)
 
         if not user:
             logger.info("User with id: %s. Not Found",user_id)
             raise UserNotFoundError("Пользователь не найден")
+
+
         inventory_rows, sent_rows, received_rows = await asyncio.gather( self.inventory_repo.get_inventory(user_id),
             self.transaction_repo.get_history_from_user(user_id),
             self.transaction_repo.get_history_to_user(user_id)
         )
         logger.info("User information successfully retrieved: %s",user_id)
-        return {
+
+        result =  {
             "coins": user.coins,
             "inventory": [
                 {"type": row.type, "quantity": row.quantity} for row in inventory_rows
@@ -50,6 +66,17 @@ class UserService:
                 "sent": [{"toUser": row.toUser, "amount": row.amount} for row in sent_rows]
             }
         }
+
+        await self.cache.set(
+            cache_key,
+            result,
+            ttl=60,
+        )
+
+        logger.info(
+            "User information successfully retrieved: %s", user_id
+        )
+        return result
 
     async def create_user(self, username: str, password: str):
         existing_user = await self.user_repo.get_by_username(username)
@@ -124,10 +151,11 @@ class MerchService:
     
 
 class TransactionService:
-    def __init__(self, db:AsyncSession):
+    def __init__(self, db:AsyncSession, cache: RedisCache = redis_cache):
         self.db = db
         self.user_repo = UserRepository(db)
         self.transaction_repo = TransactionRepository(db)
+        self.cache = redis_cache
     
     async def send_coin(self, from_user_id: int, to_username: str, amount: int):
         if amount <= 0:
@@ -171,6 +199,15 @@ class TransactionService:
                     receiver.id,
                     amount
                 )
+            for user_id in (from_user_id, receiver.id):
+                try:
+                    await self.cache.delete(f"user:info:{user_id}")
+                except Exception:
+                    logger.exception(
+                        "Failed to invalidate user cache: user_id=%s",
+                        user_id,
+                    )
+
         except Exception:
             logger.exception(
                 "Unexpected error during coin transfer: from_user_id=%s, to_username=%s, amount=%s",
@@ -182,12 +219,13 @@ class TransactionService:
 
 
 class InventoryService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, cache: RedisCache = redis_cache):
         self.db = db
         self.user_repo = UserRepository(db)
         self.inventory_repo = InventoryRepository(db)
         self.merch_service = MerchService(db=self.db)
         self.purchase_history_repo = PurchaseHistoryRepository(db)
+        self.cache = redis_cache
 
     async def buy_item(self, item_name: str, user_id: int):
         try:
@@ -251,6 +289,13 @@ class InventoryService:
                     user_id,
                     item.name,
                     item.price,
+                )
+            try:
+                await self.cache.delete(f"user:info:{user_id}")
+            except Exception:
+                logger.exception(
+                    "Failed to invalidate user cache: user_id=%s",
+                    user_id,
                 )
         except Exception:
             logger.exception(

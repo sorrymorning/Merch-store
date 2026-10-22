@@ -35,6 +35,11 @@ class RedisCache:
 
         check = await self.redis.get(key)
 
+    async def delete(self, key:str) -> None:
+        if not self.redis:
+            return None
+        await self.redis.delete(key)
+
 
 
 redis_cache = RedisCache(redis_url=settings.REDIS_URL)

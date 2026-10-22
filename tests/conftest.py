@@ -82,6 +82,7 @@ def make_inventory():
 
 @pytest.fixture
 def user_service(mock_db):
+    fake_cache = RedisCache(redis_url="redis://fake:6379/0")
     service = UserService(db=mock_db)
     service.user_repo = AsyncMock()
     service.inventory_repo = AsyncMock()
