@@ -43,13 +43,6 @@ class UserService:
             logger.info("User with id: %s. Not Found", user_id)
             raise UserNotFoundError("Пользователь не найден")
 
-        user = await self.user_repo.get_by_id(user_id)
-
-        if not user:
-            logger.info("User with id: %s. Not Found",user_id)
-            raise UserNotFoundError("Пользователь не найден")
-
-
         inventory_rows, sent_rows, received_rows = await asyncio.gather( self.inventory_repo.get_inventory(user_id),
             self.transaction_repo.get_history_from_user(user_id),
             self.transaction_repo.get_history_to_user(user_id)
@@ -87,6 +80,7 @@ class UserService:
 
         user = await self.user_repo.create(
             username=username,
+            # TODO: Добавить хеширование пароля
             password_hash=password
         )
         await self.db.commit()
@@ -111,7 +105,7 @@ class MerchService:
     def __init__(self,db: AsyncSession, cache: RedisCache = redis_cache):
         self.db = db
         self.merch_repo = MerchRepository(db)
-        self.cache = redis_cache
+        self.cache = cache
 
 
     async def create_merch(self, merch_name:str, merch_price:int):
@@ -147,7 +141,7 @@ class MerchService:
             json.dumps(merch_dict)
         )
         logger.info("Successfully got merch: %s", name)
-        return merch
+        return merch_dict
     
 
 class TransactionService:
@@ -207,7 +201,6 @@ class TransactionService:
                         "Failed to invalidate user cache: user_id=%s",
                         user_id,
                     )
-
         except Exception:
             logger.exception(
                 "Unexpected error during coin transfer: from_user_id=%s, to_username=%s, amount=%s",
