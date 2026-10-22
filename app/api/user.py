@@ -16,19 +16,20 @@ router = APIRouter(prefix="/api")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
 class LoginRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=3, max_length=50)
+    password: str = Field(min_length=8, max_length=128)
+
 
 class RegisterRequest(BaseModel):
-    username: str
-    password: str
+    username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
+    password: str = Field(min_length=8, max_length=128)
 
 class SendCoinRequest(BaseModel):
-    toUser: str
+    toUser: str = Field(min_length=3, max_length=50)
     amount: int = Field(gt=0)
 
 class CreateItemRequest(BaseModel):
-    merch_name:str
+    merch_name:str = Field(min_length=3, max_length=50)
     merch_price:int = Field(gt=0)
 
 
@@ -118,7 +119,7 @@ async def get_info(
     return user
 
 
-@router.post("/sendCoin", status_code= status.HTTP_200_OK)
+@router.post("/send_coin", status_code= status.HTTP_200_OK)
 async def send_coin(
     data: SendCoinRequest,
     user_id: int = Depends(get_current_user_id),
