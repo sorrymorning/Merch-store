@@ -5,7 +5,10 @@ from app.api.user import router as user_router
 from app.services.services_errors import (UserNotFoundError,
                                             NotEnoughCoinsError,
                                             SelfTransferError,
-                                            ItemNotFoundError
+                                            ItemNotFoundError,
+                                            UserAlreadyExistsError,
+                                            InvalidCredentialsError,
+                                            InvalidAmountError
                                         )
 from app.core.logger import setup_logging
 from contextlib import asynccontextmanager
@@ -44,7 +47,10 @@ async def not_enough_coins_handler(request: Request, exc: NotEnoughCoinsError):
     )
 
 @app.exception_handler(SelfTransferError)
-async def self_transfer_handler(request: Request, exc: SelfTransferError):
+async def self_transfer_handler(
+    request: Request, 
+    exc: SelfTransferError
+):
     return JSONResponse(
         status_code=400,
         content={"errors": str(exc)}
@@ -52,8 +58,33 @@ async def self_transfer_handler(request: Request, exc: SelfTransferError):
 
 
 @app.exception_handler(ItemNotFoundError)
-async def item_not_found_handler(request: Request, exc:ItemNotFoundError):
+async def item_not_found_handler(
+    request: Request, 
+    exc:ItemNotFoundError
+):
     return JSONResponse(
         status_code=400,
         content={"errors": str(exc)}
+    )
+
+
+@app.exception_handler(UserAlreadyExistsError)
+async def user_already_exists_handler(
+    request: Request,
+    exc: UserAlreadyExistsError,
+):
+    return JSONResponse(
+        status_code=409,
+        content={"errors": str(exc)},
+    )
+
+
+@app.exception_handler(InvalidCredentialsError)
+async def invalid_credentials_handler(
+    request: Request,
+    exc: InvalidCredentialsError,
+):
+    return JSONResponse(
+        status_code=401,
+        content={"errors": str(exc)},
     )
