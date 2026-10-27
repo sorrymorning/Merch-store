@@ -23,16 +23,6 @@ The application allows users to:
 - view their inventory and transaction history
 - inspect sales analytics via dashboard
 
-This repository is suitable as a portfolio project because it combines several production-relevant concepts:
-- API layer
-- service layer
-- repository layer
-- data models
-- business logic validation
-- caching
-- observability basics
-- Docker setup
-
 ## Tech Stack
 
 - Python 3.12+
@@ -46,94 +36,6 @@ This repository is suitable as a portfolio project because it combines several p
 - Streamlit
 - Pytest
 - Docker & Docker Compose
-
-## Project Structure
-
-```text
-.
-├── app/
-│   ├── api/
-│   │   └── user.py
-│   ├── cache/
-│   │   └── cache.py
-│   ├── core/
-│   │   ├── config.py
-│   │   └── logger.py
-│   ├── db/
-│   │   └── database.py
-│   ├── models/
-│   │   └── models.py
-│   ├── repositories/
-│   │   └── repository.py
-│   ├── services/
-│   │   ├── services.py
-│   │   └── services_errors.py
-│   ├── main.py
-│   └── __init__.py
-├── alembic/
-│   ├── versions/
-│   ├── env.py
-│   └── script.py.mako
-├── tests/
-│   ├── conftest.py
-│   ├── test_integration.py
-│   └── test_services.py
-├── analytics.py
-├── .env.example
-├── .env.test
-├── Dockerfile
-├── docker-compose.yaml
-├── requirements.txt
-├── create_view.sql
-├── alembic.ini
-├── prestart.sh
-├── .gitignore
-├── README.md
-└── LICENSE (optional)
-```
-
-## How it works
-
-### 1. User flow
-- User registers via `/api/register`
-- User logs in via `/api/login`
-- JWT token is returned
-- Token is used to access protected routes
-
-### 2. Coin transfer flow
-- User sends coins to another user
-- Server validates:
-  - sender exists
-  - receiver exists
-  - sender is not giving to themselves
-  - amount is positive
-  - sender has enough balance
-- Transaction is recorded in the database
-- User cache is invalidated
-
-### 3. Product purchase flow
-- User buys an item by name
-- App checks:
-  - user exists
-  - item exists
-  - user has enough coins
-- Item gets added to inventory
-- Purchase history is saved
-- User data cache is invalidated
-
-### 4. Caching
-Redis is used to cache frequently requested information, such as:
-- user profiles
-- merch data
-
-This reduces repeated database reads and helps improve performance.
-
-### 5. Analytics dashboard
-The `analytics.py` file contains a Streamlit dashboard that reads the `product_sales_mart` table and displays:
-- revenue by product
-- sold items
-- number of buyers
-- sales overview
 
 ## How to run
 
@@ -205,8 +107,6 @@ The codebase is split into a simple layered structure:
 - Cache: `app/cache/cache.py`
 - Analytics: `analytics.py`
 
-This structure keeps responsibilities separated and makes it easier to understand the domain and extend the app.
-
 ## API endpoints
 
 Base path: `/api`
@@ -219,7 +119,7 @@ Register a new user.
 Request:
 ```json
 {
-  "username": "amir",
+  "username": "username",
   "password": "secret123"
 }
 ```
@@ -228,7 +128,7 @@ Response:
 ```json
 {
   "id": 1,
-  "username": "amir"
+  "username": "username"
 }
 ```
 
@@ -237,7 +137,7 @@ Authenticate the user and get a JWT token.
 
 Request form data:
 ```text
-username=amir
+username=username
 password=secret123
 ```
 
@@ -329,32 +229,6 @@ Returns a basic health response.
 }
 ```
 
-## Testing strategy
-
-The project includes a `pytest`-based test suite for validation of core logic.
-
-### Run tests
-```bash
-pytest -q
-```
-
-### Run a specific file
-```bash
-pytest tests/test_services.py -q
-```
-
-### Existing testing approach
-The project uses:
-- async fixtures
-- mocked repositories
-- service-level validation
-- FastAPI test client patterns
-
-This helps validate:
-- happy path flows
-- validation on not found cases
-- transfer restrictions
-- item purchasing logic
 
 ## TODO / Planned improvements
 
@@ -377,18 +251,3 @@ This project has room for improvement before it is ready for a production-grade 
 - [ ] Remove hardcoded secrets and secure env configuration
 - [ ] Add better health checks for database and Redis readiness
 
-## Notes
-
-This project is a good foundation for a portfolio because it already includes:
-- FastAPI
-- async SQLAlchemy
-- JWT auth
-- Redis cache
-- Docker support
-- basic analytics dashboard
-
-It still needs a few production-ready improvements, but it clearly demonstrates practical backend development skills.
-
-## License
-
-This project does not currently declare a license. If you plan to publish it publicly, consider adding an MIT or Apache 2.0 license.
