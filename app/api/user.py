@@ -149,7 +149,7 @@ async def add_item(
 
     return {"status": "created"}
 
-@router.post("/buy/{item}")
+@router.get("/buy/{item}")
 async def but_item(
     item:str,
     user_id: int = Depends(get_current_user_id),

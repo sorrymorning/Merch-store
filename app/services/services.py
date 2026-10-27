@@ -135,7 +135,6 @@ class MerchService:
             "name": merch.name,
             "price": merch.price
         }
-
         await self.cache.set(
             cache_key,
             json.dumps(merch_dict)
@@ -235,21 +234,21 @@ class InventoryService:
                     logger.warning("Purchase failed: item not found, item_name=%s", item_name)
                     raise ItemNotFoundError("Товар не найден")
 
-                if user.coins < item.price:
+                if user.coins < item["price"]:
                     logger.warning(
                         "Not enough coins to buy item: user_id=%s, item=%s, price=%s, balance=%s",
                         user_id,
-                        item.name,
-                        item.price,
+                        item["name"],
+                        item["price"],
                         user.coins
                     )
                     raise NotEnoughCoinsError("Недостаточно средств для покупки")
-
-                user.coins -= item.price
-
+                print("До вычитания",user.coins)
+                user.coins -= item["price"]
+                print("После вычитания",user.coins)
                 inventory_item = await self.inventory_repo.get_user_item_for_update(
                     user_id=user_id,
-                    merch_id=item.id
+                    merch_id=item["id"]
                 )
 
                 if inventory_item:
@@ -257,31 +256,31 @@ class InventoryService:
                     logger.info(
                         "Increased item quantity in inventory: user_id=%s, merch_id=%s, new_qty=%s",
                         user_id,
-                        item.id,
+                        item["id"],
                         inventory_item.quantity,
                     )
                 else:
                     await self.inventory_repo.create_purchase(
                         user_id=user_id,
-                        merch_id=item.id
+                        merch_id=item["id"]
                     )
                     logger.info(
                         "Created new inventory record: user_id=%s, merch_id=%s",
                         user_id,
-                        item.id,
+                        item["id"]
                     )
 
                 await self.purchase_history_repo.create_purchase(
                     user_id=user_id,
-                    merch_id=item.id,
+                    merch_id=item["id"],
                     quantity=1
                 )
                 
                 logger.info(
                     "Purchase completed successfully: user_id=%s, item=%s, price=%s",
                     user_id,
-                    item.name,
-                    item.price,
+                    item["name"],
+                    item["price"],
                 )
             try:
                 await self.cache.delete(f"user:info:{user_id}")
